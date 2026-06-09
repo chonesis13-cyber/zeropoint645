@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로또 영점 사격 시스템</title>
+    <style>
+        :root {
+            --bg-color: #0d0e12;
+            --card-color: #161824;
+            --primary-color: #7b2cbf;
+            --primary-hover: #9d4edd;
+            --text-color: #ffffff;
+            --text-muted: #94a3b8;
+            --accent-color: #ffb703;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin: 5px 0 0 0;
+        }
+
+        .card {
+            background-color: var(--card-color);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 1단: 번호 추출 */
+        .btn-extract {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-extract:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .result-container {
+            margin-top: 15px;
+            text-align: center;
+            min-height: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .ball-container {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+
+        .ball {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        /* 2단: 10주차 추이 테이블 */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: normal;
+            padding: 8px;
+            border-bottom: 1px solid #2d3142;
+        }
+
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #1f2235;
+        }
+
+        .badge {
+            background-color: #2d3142;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        /* 3단: 당첨 확인 */
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .input-group input {
+            flex: 1;
+            background-color: #0d0e12;
+            border: 1px solid #2d3142;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .btn-check {
+            width: 100%;
+            background-color: #2d3142;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #check-result {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header>
+        <h1>🎯 로또 영점 사격 시스템</h1>
+        <p>기밀 유지 알고리즘 구동 중</p>
+    </header>
+
+    <!-- 1단: 번호 추출 -->
+    <div class="card">
+        <div class="section-title">🚀 영점 조절 추출기</div>
+        <button class="btn-extract" onclick="extractNumbers()">AI 번호 추출하기</button>
+        <div class="result-container" id="extract-result">
+            <span style="color: var(--text-muted);">버튼을 눌러 번호를 추출하세요</span>
+        </div>
+    </div>
+
+    <!-- 2단: 최근 10주차 합계 추이 -->
+    <div class="card">
+        <div class="section-title">📊 최근 주요 회차 추이</div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>회차</th>
+                        <th>당첨 번호</th>
+                        <th>합계</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1221회</td>
+                        <td>6, 12, 19, 21, 34, 43</td>
+                        <td><span class="badge">135</span></td>
+                    </tr>
+                    <tr>
+                        <td>1220회</td>
+                        <td>2, 14, 23, 31, 33, 39</td>
+                        <td><span class="badge">142</span></td>
+                    </tr>
+                    <tr>
+                        <td>1219회</td>
+                        <td>1, 14, 15, 28, 39, 45</td>
+                        <td><span class="badge">142</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 3단: 당첨 확인 -->
+    <div class="card">
+        <div class="section-title">🔍 내 번호 당첨 확인</div>
+        <div class="input-group">
+            <input type="number" id="n1" placeholder="1">
+            <input type="number" id="n2" placeholder="2">
+            <input type="number" id="n3" placeholder="3">
+            <input type="number" id="n4" placeholder="4">
+            <input type="number" id="n5" placeholder="5">
+            <input type="number" id="n6" placeholder="6">
+        </div>
+        <button class="btn-check" onclick="checkLotto()">당첨 결과 확인</button>
+        <div id="check-result"></div>
+    </div>
+</div>
+
+<script>
+    // 임시 추출 기능 (추후 우리 자석 알고리즘 적용 공간)
+    function extractNumbers() {
+        let numbers = [];
+        while(numbers.length < 6) {
+            let num = Math.floor(Math.random() * 45) + 1;
+            if(!numbers.includes(num)) numbers.push(num);
+        }
+        numbers.sort((a,b) => a-b);
+        let sum = numbers.reduce((a,b) => a+b, 0);
+
+        let colors = ['#f1c40f', '#3498db', '#e74c3c', '#95a5a6', '#2ecc71'];
+        
+        let html = '<div class="ball-container">';
+        numbers.forEach(num => {
+            let colorIdx = Math.floor((num-1)/10);
+            html += `<div class="ball" style="background-color: ${colors[colorIdx]}">${num}</div>`;
+        });
+        html += `</div><span style="font-size:0.85rem; color:var(--text-muted);">합계: ${sum}</span>`;
+        
+        document.getElementById('extract-result').innerHTML = html;
+    }
+
+    // 임시 당첨 확인 기능 (1221회 기준)
+    function checkLotto() {
+        let winning = [6, 12, 19, 21, 34, 43];
+        let userNum = [
+            parseInt(document.getElementById('n1').value),
+            parseInt(document.getElementById('n2').value),
+            parseInt(document.getElementById('n3').value),
+            parseInt(document.getElementById('n4').value),
+            parseInt(document.getElementById('n5').value),
+            parseInt(document.getElementById('n6').value)
+        ];
+
+        let matchCount = userNum.filter(x => winning.includes(x)).length;
+        let resultTxt = `1221회 기준 ${matchCount}개 일치! `;
+        
+        if(matchCount === 6) resultTxt += "🎉 1등 당첨!!!";
+        else if(matchCount === 5) resultTxt += "🥳 3등 등극!! (모였으면 1등!)";
+        else if(matchCount === 4) resultTxt += "👍 4등 당첨! (모였으면 3등!)";
+        else resultTxt += "ㅠㅠ 아쉽게 낙첨! 영점 재조정이 필요합니다.";
+
+        document.getElementById('check-result').innerText = resultTxt;
+    }
+</script>
+</body>
+</html>
