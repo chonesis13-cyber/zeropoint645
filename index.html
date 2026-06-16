@@ -158,7 +158,6 @@
             text-shadow: 0px 1px 2px rgba(0,0,0,0.6);
         }
 
-        /* 저장 버튼 */
         .btn-save {
             width: 100%;
             background-color: #2a9d8f;
@@ -170,15 +169,16 @@
             font-size: 0.9rem;
             cursor: pointer;
             margin-top: 10px;
-            display: none; /* 번호 추출 전에는 숨김 */
+            display: none;
         }
 
-        /* 2단: 10주차 추이 테이블 */
+        /* 2단: 10주차 추이 테이블 스크롤 및 로딩 */
         .table-wrapper {
             overflow-y: auto;
-            max-height: 200px;
+            max-height: 240px;
             border-radius: 8px;
             border: 1px solid #1f2235;
+            position: relative;
         }
 
         table {
@@ -217,6 +217,13 @@
             font-size: 0.8rem;
             font-weight: bold;
             display: inline-block;
+        }
+
+        .loading-text {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--text-muted);
+            font-size: 0.85rem;
         }
 
         /* 3단: 저장 목록 및 당첨 확인 */
@@ -317,9 +324,9 @@
     </div>
 
     <div class="card">
-        <div class="section-title">📊 최근 10주차 추이 분석</div>
+        <div class="section-title">📊 최근 10주차 추이 분석 (실시간)</div>
         <div class="table-wrapper">
-            <table>
+            <table id="lotto-table" style="display: none;">
                 <thead>
                     <tr>
                         <th>회차</th>
@@ -327,38 +334,90 @@
                         <th>합계</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr><td>1221회</td><td>6, 12, 19, 21, 34, 43</td><td><span class="badge" style="border-left: 3px solid #2ecc71;">135</span></td></tr>
-                    <tr><td>1220회</td><td>2, 14, 23, 31, 33, 39</td><td><span class="badge" style="border-left: 3px solid #f1c40f;">142</span></td></tr>
-                    <tr><td>1219회</td><td>1, 14, 15, 28, 39, 45</td><td><span class="badge" style="border-left: 3px solid #f1c40f;">142</span></td></tr>
-                    <tr><td>1218회</td><td>5, 12, 17, 24, 31, 40</td><td><span class="badge" style="border-left: 3px solid #2ecc71;">129</span></td></tr>
-                    <tr><td>1217회</td><td>3, 18, 20, 24, 32, 44</td><td><span class="badge" style="border-left: 3px solid #e74c3c;">141</span></td></tr>
-                    <tr><td>1216회</td><td>11, 13, 17, 21, 33, 36</td><td><span class="badge" style="border-left: 3px solid #2ecc71;">131</span></td></tr>
-                    <tr><td>1215회</td><td>4, 10, 19, 28, 34, 41</td><td><span class="badge" style="border-left: 3px solid #2ecc71;">136</span></td></tr>
-                    <tr><td>1214회</td><td>1, 15, 19, 22, 37, 44</td><td><span class="badge" style="border-left: 3px solid #f1c40f;">138</span></td></tr>
-                    <tr><td>1213회</td><td>8, 14, 25, 29, 33, 40</td><td><span class="badge" style="border-left: 3px solid #f1c40f;">149</span></td></tr>
-                    <tr><td>1212회</td><td>3, 7, 14, 21, 31, 45</td><td><span class="badge" style="border-left: 3px solid #2ecc71;">121</span></td></tr>
-                </tbody>
+                <tbody id="lotto-table-body">
+                    </tbody>
             </table>
+            <div id="table-loading" class="loading-text">📡 동행복권 기밀 저장소 동기화 중...</div>
         </div>
     </div>
 
     <div class="card">
-        <div class="section-title">🔍 내 저장 조합 및 당첨 확인</div>
-        <div class="saved-list" id="saved-list-container">
-            </div>
-        <div id="check-result"></div>
+        <div class="section-title" id="check-section-title">🔍 내 저장 조합 및 당첨 확인</div>
+        <div class="saved-list" id="saved-list-container"></div>
+        <div id="check-result" style="white-space: pre-line;"></div>
     </div>
 </div>
 
 <script>
-    let currentExtracted = []; // 현재 추출되어 대기 중인 번호 스토리지
-    let colors = ['#f1c40f', '#3498db', '#e74c3c', '#95a5a6', '#2ecc71'];
+    let currentExtracted = []; 
+    let latestWinningNumbers = []; // 실시간 가장 최신회차 당첨 정보 저장고
+    let latestDrawNo = 1228; // 통신 장애 시 작동할 안전 장치 기본값
+    const colors = ['#f1c40f', '#3498db', '#e74c3c', '#95a5a6', '#2ecc71'];
 
-    // 페이지 로드 시 저장된 번호 불러오기
     window.onload = function() {
         renderSavedList();
+        fetchLatestLottoData(); // 켜지자마자 데이터 실시간 동기화 시작
     };
+
+    // 1. 최신 로또 회차 자동 계산 및 10주치 데이터 동시 로딩 엔진
+    async function fetchLatestLottoData() {
+        try {
+            // 기준일(1228회 추첨일: 2026-06-13 20:45) 기반으로 현재 최신 회차 자동 연산
+            const baseDate = new Date("2026-06-13T20:45:00");
+            const now = new Date();
+            const diffMs = now - baseDate;
+            const diffWeeks = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 7));
+            latestDrawNo = 1228 + (diffWeeks > 0 ? diffWeeks : 0);
+
+            let tableBody = document.getElementById('lotto-table-body');
+            tableBody.innerHTML = '';
+
+            // 동행복권 차단벽 우회를 위한 고성능 프록시 조합식 순회 비동기 큐
+            let promises = [];
+            for (let i = 0; i < 10; i++) {
+                let drawNo = latestDrawNo - i;
+                let targetUrl = `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drawNo}`;
+                let proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                promises.push(fetch(proxyUrl).then(res => res.json()));
+            }
+
+            const results = await Promise.all(promises);
+            
+            results.forEach((res, index) => {
+                let data = JSON.parse(res.contents);
+                if (data.returnValue === "success") {
+                    let drawNum = data.drwNo;
+                    let nums = [data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6];
+                    let sum = nums.reduce((a, b) => a + b, 0);
+
+                    // 최초 1바퀴째(맨 위 최신 회차) 데이터는 실시간 채점 엔진에 즉시 박제
+                    if (index === 0) {
+                        latestWinningNumbers = [...nums];
+                        document.getElementById('check-section-title').innerText = `🔍 내 저장 조합 및 당첨 확인 (${drawNum}회 기준)`;
+                    }
+
+                    // 합계 인디케이터 색상띠 제어
+                    let borderStyle = "border-left: 3px solid #f1c40f;";
+                    if (sum <= 129) borderStyle = "border-left: 3px solid #2ecc71;";
+                    else if (sum >= 146) borderStyle = "border-left: 3px solid #e74c3c;";
+
+                    let row = `<tr>
+                        <td>${drawNum}회</td>
+                        <td>${nums.join(', ')}</td>
+                        <td><span class="badge" style="${borderStyle}">${sum}</span></td>
+                    </tr>`;
+                    tableBody.innerHTML += row;
+                }
+            });
+
+            document.getElementById('table-loading').style.display = 'none';
+            document.getElementById('lotto-table').style.display = 'table';
+
+        } catch (error) {
+            console.error("데이터 동기화 실패:", error);
+            document.getElementById('table-loading').innerText = "📡 통신 대기 중... 네트워크 확인 후 새로고침해 주세요.";
+        }
+    }
 
     function extractNumbers() {
         let minSum = parseInt(document.getElementById('min-sum').value) || 130;
@@ -390,39 +449,34 @@
             let colorIdx = Math.floor((num - 1) / 10);
             html += `<div class="ball" style="background-color: ${colors[colorIdx]}">${num}</div>`;
         });
-        html += `</div><span style="font-size:0.85rem; color:var(--text-muted);">합계: ${finalSum}</span>`;
+        html += `</div><span style="font-size:0.85rem; color:var(--text-muted);">합계: ${finalSum} (연산: ${attempts + 1}회)</span>`;
         
         document.getElementById('extract-result').innerHTML = html;
-        document.getElementById('btn-save-action').style.display = 'block'; // 저장 버튼 활성화
+        document.getElementById('btn-save-action').style.display = 'block';
     }
 
-    // 로컬 스토리지에 현재 조합 보관
     function saveCurrentNumbers() {
         if (currentExtracted.length !== 6) return;
-        
         let saved = JSON.parse(localStorage.getItem('myLottoNumbers')) || [];
-        
-        // 중복 저장 방지 검증
         let isDuplicate = saved.some(item => JSON.stringify(item) === JSON.stringify(currentExtracted));
         
         if (isDuplicate) {
-            alert("이미 저장소에 보관 중인 조합입니다. 🎯");
+            alert("이미 보관함에 들어있는 정예 번호 조합입니다. 🎯");
             return;
         }
 
         saved.push(currentExtracted);
         localStorage.setItem('myLottoNumbers', JSON.stringify(saved));
         renderSavedList();
-        alert("정예 조합으로 저장 완료! 하단 목록을 확인하세요. 🔒");
+        alert("기밀 보관함에 저장을 완료했습니다! 🔒");
     }
 
-    // 저장된 번호 리스트 출력 화면 렌더링
     function renderSavedList() {
         let saved = JSON.parse(localStorage.getItem('myLottoNumbers')) || [];
         let container = document.getElementById('saved-list-container');
         
         if (saved.length === 0) {
-            container.innerHTML = '<div class="no-data">저장된 기밀 조합이 없습니다. 번호를 추출해 마음에 드는 조합을 저장해 보세요!</div>';
+            container.innerHTML = '<div class="no-data">저장된 기밀 조합이 없습니다. 번호를 추출하여 조합을 세이브해 보세요!</div>';
             return;
         }
 
@@ -444,7 +498,6 @@
         container.innerHTML = html;
     }
 
-    // 특정 세트 삭제 기능
     function deleteSet(index) {
         let saved = JSON.parse(localStorage.getItem('myLottoNumbers')) || [];
         saved.splice(index, 1);
@@ -453,20 +506,23 @@
         document.getElementById('check-result').innerText = '';
     }
 
-    // 원클릭 당첨 확인 엔진 (최신 1221회 기준 조준)
+    // 2. 실시간 최신 회차 매칭 당첨 확인 엔진
     function checkSpecificSet(index) {
-        let winning = [6, 12, 19, 21, 34, 43];
         let saved = JSON.parse(localStorage.getItem('myLottoNumbers')) || [];
         let targetSet = saved[index];
 
+        // 만약 실시간 서버 통신이 끊겼을 경우를 대비한 안전 장치 탑재
+        let winning = latestWinningNumbers.length === 6 ? latestWinningNumbers : [24, 29, 30, 31, 35, 44];
+        let currentCheckDraw = latestWinningNumbers.length === 6 ? latestDrawNo : 1228;
+
         let matchCount = targetSet.filter(x => winning.includes(x)).length;
-        let resultTxt = `[선택 조합] 1221회 당첨 결과: ${matchCount}개 일치\n`;
+        let resultTxt = `[조합 ${index + 1}] 최신 ${currentCheckDraw}회 당첨 확인: ${matchCount}개 일치\n`;
         
-        if (matchCount === 6) resultTxt += "🎉 대박!! 1등 당첨입니다!!! 🍾";
-        else if (matchCount === 5) resultTxt += "🥳 3등 당첨!! 한 줄에 다 모였습니다!";
-        else if (matchCount === 4) resultTxt += "👍 4등 당첨! 고지가 머지않았습니다.";
-        else if (matchCount === 3) resultTxt += "🌱 5등 본전 치기! 다음 회차 조준 완료.";
-        else resultTxt += "🤫 아쉽게 낙첨! 영점을 조금만 더 보정해 보시죠.";
+        if (matchCount === 6) resultTxt += "🎉 대박!! 1등 명중!! 당장 농협으로 사격 개시!!! 🍾";
+        else if (matchCount === 5) resultTxt += "🥳 와! 3등 보너스 구간 등극!! 영점이 거의 일치했습니다!";
+        else if (matchCount === 4) resultTxt += "👍 4등 당첨! 탄착군이 좁혀지고 있습니다.";
+        else if (matchCount === 3) resultTxt += "🌱 5등 당첨! 본전 확보 완료. 사격 유지하세요!";
+        else resultTxt += "🤫 아쉽게 낙첨! 영점 나사를 한 클릭만 조절해 보시죠.";
 
         document.getElementById('check-result').innerText = resultTxt;
     }
