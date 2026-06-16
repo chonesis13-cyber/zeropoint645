@@ -67,7 +67,6 @@
             gap: 8px;
         }
 
-        /* 합계 범위 설정 */
         .range-container {
             display: flex;
             align-items: center;
@@ -108,7 +107,6 @@
             font-size: 0.85rem;
         }
 
-        /* 1단: 번호 추출 */
         .btn-extract {
             width: 100%;
             background-color: var(--primary-color);
@@ -172,13 +170,11 @@
             display: none;
         }
 
-        /* 2단: 10주차 추이 테이블 스크롤 및 로딩 */
         .table-wrapper {
             overflow-y: auto;
             max-height: 240px;
             border-radius: 8px;
             border: 1px solid #1f2235;
-            position: relative;
         }
 
         table {
@@ -221,12 +217,23 @@
 
         .loading-text {
             text-align: center;
-            padding: 30px 0;
+            padding: 30px 15px;
             color: var(--text-muted);
             font-size: 0.85rem;
+            line-height: 1.5;
         }
 
-        /* 3단: 저장 목록 및 당첨 확인 */
+        .btn-retry {
+            background-color: #2d3142;
+            color: white;
+            border: 1px solid #3d425c;
+            padding: 6px 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
         .saved-list {
             display: flex;
             flex-direction: column;
@@ -306,7 +313,6 @@
 
     <div class="card">
         <div class="section-title">🚀 영점 조절 추출기</div>
-        
         <div class="range-container">
             <span class="range-title">🎯 목표 합계 설정</span>
             <div class="range-inputs">
@@ -315,7 +321,6 @@
                 <input type="number" id="max-sum" value="145">
             </div>
         </div>
-
         <button class="btn-extract" onclick="extractNumbers()">AI 번호 추출하기</button>
         <div class="result-container" id="extract-result">
             <span style="color: var(--text-muted);">버튼을 눌러 번호를 추출하세요</span>
@@ -334,8 +339,7 @@
                         <th>합계</th>
                     </tr>
                 </thead>
-                <tbody id="lotto-table-body">
-                    </tbody>
+                <tbody id="lotto-table-body"></tbody>
             </table>
             <div id="table-loading" class="loading-text">📡 동행복권 기밀 저장소 동기화 중...</div>
         </div>
@@ -350,19 +354,19 @@
 
 <script>
     let currentExtracted = []; 
-    let latestWinningNumbers = []; // 실시간 가장 최신회차 당첨 정보 저장고
-    let latestDrawNo = 1228; // 통신 장애 시 작동할 안전 장치 기본값
+    let latestWinningNumbers = []; 
+    let latestDrawNo = 1228; 
     const colors = ['#f1c40f', '#3498db', '#e74c3c', '#95a5a6', '#2ecc71'];
 
     window.onload = function() {
         renderSavedList();
-        fetchLatestLottoData(); // 켜지자마자 데이터 실시간 동기화 시작
+        fetchLatestLottoData(); 
     };
 
-    // 1. 최신 로또 회차 자동 계산 및 10주치 데이터 동시 로딩 엔진
+    // 🚀 프록시 서버 안정성 대폭 강화 엔진 (2중 우회 및 타임아웃 예외 제어)
     async function fetchLatestLottoData() {
+        const loadingDiv = document.getElementById('table-loading');
         try {
-            // 기준일(1228회 추첨일: 2026-06-13 20:45) 기반으로 현재 최신 회차 자동 연산
             const baseDate = new Date("2026-06-13T20:45:00");
             const now = new Date();
             const diffMs = now - baseDate;
@@ -372,31 +376,44 @@
             let tableBody = document.getElementById('lotto-table-body');
             tableBody.innerHTML = '';
 
-            // 동행복권 차단벽 우회를 위한 고성능 프록시 조합식 순회 비동기 큐
+            // 가장 우회 성공률이 높은 'codetabs' 프록시 통로로 주 전선 교체
             let promises = [];
             for (let i = 0; i < 10; i++) {
                 let drawNo = latestDrawNo - i;
                 let targetUrl = `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drawNo}`;
-                let proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-                promises.push(fetch(proxyUrl).then(res => res.json()));
+                // 차단 우회 기능이 더 유연한 타사 프록시 엔드포인트 적용
+                let proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
+                
+                promises.push(
+                    fetch(proxyUrl)
+                        .then(res => {
+                            if(!res.ok) throw new Error("Network response was not ok");
+                            return res.json();
+                        })
+                        .catch(err => {
+                            // 1차 프록시 뻑나면 2차 복구 프록시(allorigins)로 즉시 우회 구동
+                            return fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`)
+                                    .then(r => r.json())
+                                    .then(j => JSON.parse(j.contents));
+                        })
+                );
             }
 
             const results = await Promise.all(promises);
+            let successCount = 0;
             
-            results.forEach((res, index) => {
-                let data = JSON.parse(res.contents);
-                if (data.returnValue === "success") {
+            results.forEach((data, index) => {
+                if (data && data.returnValue === "success") {
+                    successCount++;
                     let drawNum = data.drwNo;
                     let nums = [data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6];
                     let sum = nums.reduce((a, b) => a + b, 0);
 
-                    // 최초 1바퀴째(맨 위 최신 회차) 데이터는 실시간 채점 엔진에 즉시 박제
-                    if (index === 0) {
+                    if (index === 0 || latestWinningNumbers.length === 0) {
                         latestWinningNumbers = [...nums];
                         document.getElementById('check-section-title').innerText = `🔍 내 저장 조합 및 당첨 확인 (${drawNum}회 기준)`;
                     }
 
-                    // 합계 인디케이터 색상띠 제어
                     let borderStyle = "border-left: 3px solid #f1c40f;";
                     if (sum <= 129) borderStyle = "border-left: 3px solid #2ecc71;";
                     else if (sum >= 146) borderStyle = "border-left: 3px solid #e74c3c;";
@@ -410,12 +427,14 @@
                 }
             });
 
-            document.getElementById('table-loading').style.display = 'none';
+            if(successCount === 0) throw new Error("All proxy failed");
+
+            loadingDiv.style.display = 'none';
             document.getElementById('lotto-table').style.display = 'table';
 
         } catch (error) {
             console.error("데이터 동기화 실패:", error);
-            document.getElementById('table-loading').innerText = "📡 통신 대기 중... 네트워크 확인 후 새로고침해 주세요.";
+            loadingDiv.innerHTML = `⚠️ 공공 데이터 서버 트래픽 혼잡<br><span style="font-size:0.75rem; color:var(--danger-color)">우회망 지연이 발생했습니다.</span><br><button class="btn-retry" onclick="location.reload()">🎯 다시 조준 (새로고침)</button>`;
         }
     }
 
@@ -506,12 +525,10 @@
         document.getElementById('check-result').innerText = '';
     }
 
-    // 2. 실시간 최신 회차 매칭 당첨 확인 엔진
     function checkSpecificSet(index) {
         let saved = JSON.parse(localStorage.getItem('myLottoNumbers')) || [];
         let targetSet = saved[index];
 
-        // 만약 실시간 서버 통신이 끊겼을 경우를 대비한 안전 장치 탑재
         let winning = latestWinningNumbers.length === 6 ? latestWinningNumbers : [24, 29, 30, 31, 35, 44];
         let currentCheckDraw = latestWinningNumbers.length === 6 ? latestDrawNo : 1228;
 
