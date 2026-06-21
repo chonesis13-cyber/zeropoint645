@@ -343,42 +343,61 @@
 
 <script>
     let currentExtracted = []; 
-    let latestWinningNumbers = [24, 29, 30, 31, 35, 44]; // 기본 보장 기밀 데이터 (1228회)
+    let latestWinningNumbers = []; 
     let latestDrawNo = 1228; 
     const colors = ['#f1c40f', '#3498db', '#e74c3c', '#95a5a6', '#2ecc71'];
 
-    // 🔒 외부 차단막 차단 시 즉시 발동할 고정 백업 10주 차 데이터베이스
-    const localDatabase = [
-        { drwNo: 1228, nums: [24, 29, 30, 31, 35, 44], sum: 193 },
-        { drwNo: 1227, nums: [5, 11, 15, 22, 34, 40], sum: 127 },
-        { drwNo: 1226, nums: [8, 12, 18, 23, 25, 39], sum: 125 },
-        { drwNo: 1225, nums: [1, 5, 18, 29, 33, 42], sum: 128 },
-        { drwNo: 1224, nums: [7, 10, 19, 21, 33, 44], sum: 134 },
-        { drwNo: 1223, nums: [4, 13, 22, 28, 31, 44], sum: 142 },
-        { drwNo: 1222, nums: [11, 13, 15, 27, 38, 45], sum: 149 },
-        { drwNo: 1221, nums: [6, 12, 19, 21, 34, 43], sum: 135 },
-        { drwNo: 1220, nums: [2, 14, 23, 31, 33, 39], sum: 142 },
-        { drwNo: 1219, nums: [1, 14, 15, 28, 39, 45], sum: 142 }
-    ];
+    // 날짜 기반 실시간 회차 계산 함수
+    function calculateCurrentDrawNo() {
+        const baseDate = new Date("2026-06-13T20:45:00"); // 1228회차 추첨 기준점
+        const now = new Date();
+        const diffMs = now - baseDate;
+        const diffWeeks = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 7));
+        return 1228 + (diffWeeks > 0 ? diffWeeks : 0);
+    }
+
+    // 보안 우회용 가상 로컬 DB 제너레이터 (서버가 차단되어도 실시간 회차를 동적으로 생성)
+    function generateLocalDatabase(currentNo) {
+        // 기존 역대 데이터셋 매핑 정보
+        const archive = {
+            1228: { nums: [24, 29, 30, 31, 35, 44], sum: 193 },
+            1227: { nums: [5, 11, 15, 22, 34, 40], sum: 127 },
+            1226: { nums: [8, 12, 18, 23, 25, 39], sum: 125 },
+            1225: { nums: [1, 5, 18, 29, 33, 42], sum: 128 },
+            1224: { nums: [7, 10, 19, 21, 33, 44], sum: 134 },
+            1223: { nums: [4, 13, 22, 28, 31, 44], sum: 142 },
+            1222: { nums: [11, 13, 15, 27, 38, 45], sum: 149 },
+            1221: { nums: [6, 12, 19, 21, 34, 43], sum: 135 },
+            1220: { nums: [2, 14, 23, 31, 33, 39], sum: 142 },
+            1219: { nums: [1, 14, 15, 28, 39, 45], sum: 142 }
+        };
+
+        let db = [];
+        for(let i = 0; i < 10; i++) {
+            let targetNo = currentNo - i;
+            if(archive[targetNo]) {
+                db.push({ drwNo: targetNo, ...archive[targetNo] });
+            } else {
+                // 아직 토요일 추첨 전이라 데이터가 없는 신규 최신회차는 임시 안내 문구 및 1228회 대조용 세팅
+                db.push({ drwNo: targetNo, nums: [24, 29, 30, 31, 35, 44], sum: 193, isPending: true });
+            }
+        }
+        return db;
+    }
 
     window.onload = function() {
+        latestDrawNo = calculateCurrentDrawNo();
         renderSavedList();
         loadLottoSystem(); 
     };
 
-    // 타임아웃 레이스를 결합한 지능형 데이터 로딩 엔진
     async function loadLottoSystem() {
         const controller = new AbortController();
-        // 외부 프록시 통신이 1.8초 이상 지연되면 자동으로 연결을 끊고 로컬 DB로 전환
         const timeoutId = setTimeout(() => controller.abort(), 1800);
+        
+        let localDB = generateLocalDatabase(latestDrawNo);
 
         try {
-            const baseDate = new Date("2026-06-13T20:45:00");
-            const now = new Date();
-            const diffMs = now - baseDate;
-            const diffWeeks = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 7));
-            latestDrawNo = 1228 + (diffWeeks > 0 ? diffWeeks : 0);
-
             let promises = [];
             for (let i = 0; i < 10; i++) {
                 let drawNo = latestDrawNo - i;
@@ -411,6 +430,8 @@
             });
 
             if(serverData.length > 0) {
+                // 회차 순서 정렬
+                serverData.sort((a, b) => b.drwNo - a.drwNo);
                 document.getElementById('table-title').innerText = "📊 최근 주요 회차 추이 (실시간 동기화 완료)";
                 renderTable(serverData);
                 return;
@@ -418,9 +439,9 @@
             throw new Error("Server bypass failed");
 
         } catch (error) {
-            console.log("시큐어 채널 보안 우회 가동 (로컬 DB 전환)");
+            console.log("시큐어 채널 보안 우회 가동 (로컬 DB 동적 전환)");
             document.getElementById('table-title').innerText = "📊 최근 주요 회차 추이 (로컬 기밀 보안 모드)";
-            renderTable(localDatabase);
+            renderTable(localDB);
         }
     }
 
@@ -428,21 +449,25 @@
         let tableBody = document.getElementById('lotto-table-body');
         tableBody.innerHTML = '';
         
-        dataArray.forEach((item, index) => {
-            if(index === 0) {
-                latestWinningNumbers = [...item.nums];
-                latestDrawNo = item.drwNo;
-                document.getElementById('check-section-title').innerText = `🔍 내 저장 조합 및 당첨 확인 (${latestDrawNo}회 기준)`;
-            }
+        // 첫 번째 행(가장 최신 회차)을 기준으로 타겟 설정
+        let activeTarget = dataArray[0];
+        latestWinningNumbers = [...activeTarget.nums];
+        latestDrawNo = activeTarget.drwNo;
+        
+        document.getElementById('check-section-title').innerText = `🔍 내 저장 조합 및 당첨 확인 (${latestDrawNo}회 기준)`;
 
+        dataArray.forEach((item) => {
             let borderStyle = "border-left: 3px solid #f1c40f;";
             if (item.sum <= 129) borderStyle = "border-left: 3px solid #2ecc71;";
             else if (item.sum >= 146) borderStyle = "border-left: 3px solid #e74c3c;";
 
+            let numText = item.isPending ? "<span style='color:var(--text-muted); font-size:0.75rem;'>토요일 추첨 후 실시간 반영됩니다</span>" : item.nums.join(', ');
+            let sumBadge = item.isPending ? `<span class="badge" style="border-left: 3px solid var(--text-muted); color:var(--text-muted)">-</span>` : `<span class="badge" style="${borderStyle}">${item.sum}</span>`;
+
             let row = `<tr>
                 <td>${item.drwNo}회</td>
-                <td>${item.nums.join(', ')}</td>
-                <td><span class="badge" style="${borderStyle}">${item.sum}</span></td>
+                <td>${numText}</td>
+                <td>${sumBadge}</td>
             </tr>`;
             tableBody.innerHTML += row;
         });
